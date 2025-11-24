@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="eu">
   <head>
@@ -15,19 +16,24 @@
       .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
       .animate-in { animation: fadeIn 0.5s ease-out; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      
-      /* Specific Elevator Styles */
+      .animate-bounce-small { animation: bounceSmall 2s infinite; }
+      @keyframes bounceSmall { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
       .elevator-card { background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%); }
+      
+      /* Scrollbar hiding */
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
     
+    <!-- Robust Import Map using Google's Official CDN for Firebase -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
     "lucide-react": "https://esm.sh/lucide-react@0.263.1",
-    "firebase/app": "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js",
-    "firebase/database": "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js",
     "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
 }
@@ -35,6 +41,30 @@
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
+    <!-- 🔴🔴 CONFIGURATION SECTION 🔴🔴 -->
+    <!-- Paste your keys here replacing 'null'. Keep the syntax exactly as shown in Firebase Console. -->
+    <script>
+      window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDKmSAA6FNEudrsrP5KMw13ah5ovX7lY2M",
+  authDomain: "zenbaki-osoak.firebaseapp.com",
+  databaseURL: "https://zenbaki-osoak-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "zenbaki-osoak",
+  storageBucket: "zenbaki-osoak.firebasestorage.app",
+  messagingSenderId: "137265772416",
+  appId: "1:137265772416:web:16e672aee402c3b4637365"
+};;
+      // Example:
+      // window.FIREBASE_CONFIG = {
+      //   apiKey: "AIza...",
+      //   authDomain: "...",
+      //   databaseURL: "...",
+      //   projectId: "...",
+      //   storageBucket: "...",
+      //   messagingSenderId: "...",
+      //   appId: "..."
+      // };
+    </script>
+
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
@@ -44,30 +74,28 @@
         ArrowRight, ArrowLeft, BookOpen, Calculator, Home, Layout, Star, Menu, X, 
         RefreshCw, CheckCircle, AlertCircle, Lightbulb, Snowflake, 
         Sun, ThumbsUp, ThumbsDown, Globe, Trophy, User, LogOut, Timer, Trash2,
-        Eye, EyeOff, Check, AlertTriangle, Plus, Minus
+        Eye, EyeOff, Check, AlertTriangle, Plus, Minus, BarChart2, Cloud, CloudOff
       } from 'lucide-react';
       
-      // --- FIREBASE SETUP ---
+      // --- FIREBASE INITIALIZATION ---
       import { initializeApp } from 'firebase/app';
       import { getDatabase, ref, get, set, remove, update } from 'firebase/database';
 
-      // 🔴🔴 PASTE YOUR FIREBASE CONFIG HERE TO MAKE IT WORK GLOBALLY 🔴🔴
-      const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDKmSAA6FNEudrsrP5KMw13ah5ovX7lY2M",
-  authDomain: "zenbaki-osoak.firebaseapp.com",
-  databaseURL: "https://zenbaki-osoak-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "zenbaki-osoak",
-  storageBucket: "zenbaki-osoak.firebasestorage.app",
-  messagingSenderId: "137265772416",
-  appId: "1:137265772416:web:16e672aee402c3b4637365"
-};; 
-      // Example:
-      // const FIREBASE_CONFIG = { apiKey: "...", authDomain: "...", databaseURL: "...", ... };
-
       let db = null;
-      if (FIREBASE_CONFIG) {
-        const app = initializeApp(FIREBASE_CONFIG);
-        db = getDatabase(app);
+      let firebaseError = null;
+      
+      // Safely try to init firebase using the global config
+      if (window.FIREBASE_CONFIG) {
+        try {
+            const app = initializeApp(window.FIREBASE_CONFIG);
+            db = getDatabase(app);
+            console.log("Firebase initialized successfully");
+        } catch (error) {
+            console.error("Firebase Init Error:", error);
+            firebaseError = error.message;
+            // We DO NOT alert the user here to avoid annoying popups.
+            // The app will gracefully degrade to local storage.
+        }
       }
 
       // --- STORAGE MANAGER ---
@@ -94,8 +122,9 @@
               }
               return [];
             } catch (e) {
-              console.error("Firebase Error:", e);
-              return [];
+              console.error("Firebase Read Error:", e);
+              // Fallback to local if read fails (e.g. permission denied or offline)
+              return JSON.parse(localStorage.getItem(DB_KEY) || '[]');
             }
           } else {
             return JSON.parse(localStorage.getItem(DB_KEY) || '[]');
@@ -119,7 +148,14 @@
           };
 
           if (db) {
-            await set(ref(db, 'users/' + username), newUser);
+            try {
+                await set(ref(db, 'users/' + username), newUser);
+            } catch(e) {
+                console.error("Firebase Write Error", e);
+                // If cloud fails, fallback local so user is not stuck
+                users.push(newUser);
+                StorageManager.saveLocal(users);
+            }
           } else {
             users.push(newUser);
             StorageManager.saveLocal(users);
@@ -138,10 +174,11 @@
           if (user) {
              if (user.banned) return { success: false, error: 'banned' };
              
-             // Update IP/Device on login
              const updatedUser = { ...user, ip, deviceId };
              if (db) {
-                await update(ref(db, 'users/' + user.username), { ip, deviceId });
+                try {
+                    await update(ref(db, 'users/' + user.username), { ip, deviceId });
+                } catch(e) { console.error("Update Error", e); }
              } else {
                 const idx = users.findIndex(u => u.username === user.username);
                 users[idx] = updatedUser;
@@ -154,8 +191,10 @@
 
         deleteUser: async (username) => {
           if (db) {
-            await remove(ref(db, 'users/' + username));
-            return true;
+            try {
+                await remove(ref(db, 'users/' + username));
+                return true;
+            } catch (e) { console.error("Del Error", e); return false; }
           } else {
             let users = await StorageManager.getAllUsers();
             const initLen = users.length;
@@ -170,10 +209,12 @@
 
         checkUserStatus: async (username) => {
           if (db) {
-            const snapshot = await get(ref(db, 'users/' + username));
-            if (!snapshot.exists()) return 'deleted';
-            if (snapshot.val().banned) return 'banned';
-            return 'ok';
+            try {
+                const snapshot = await get(ref(db, 'users/' + username));
+                if (!snapshot.exists()) return 'deleted';
+                if (snapshot.val().banned) return 'banned';
+                return 'ok';
+            } catch(e) { return 'ok'; } // If offline, assume OK to not block user
           } else {
             const users = await StorageManager.getAllUsers();
             const u = users.find(u => u.username === username);
@@ -191,7 +232,10 @@
           const currentScore = user.scores?.[gameId] || 0;
           if (score > currentScore) {
              if (db) {
-               await update(ref(db, `users/${username}/scores`), { [gameId]: score });
+               try {
+                  await update(ref(db, `users/${username}/scores`), { [gameId]: score });
+               } catch(e) { console.error("Score Save Error", e); }
+               // Also save local cache for speed
                return { isNewRecord: true, user: { ...user, scores: { ...user.scores, [gameId]: score } } };
              } else {
                user.scores = user.scores || {};
@@ -211,7 +255,7 @@
           intro_desc: "Mundu errealean, zenbakiak ez dira beti positiboak. Zorrak, hotza, eta sotoak adierazteko... negatiboak behar ditugu!",
           nav: { intro: "Zer dira?", line: "Ordena", ops: "Eragiketak", probs: "Problemak", games: "Jolastu", records: "Errekorrak", profile: "Profila" },
           auth: { login_title: "Sartu", register_title: "Erregistratu", user_ph: "Erabiltzailea", pass_ph: "Pasahitza", btn_login: "Sartu", btn_register: "Erregistratu", no_account: "Ez duzu konturik?", has_account: "Baduzu kontua?", error_exists: "Erabiltzailea existitzen da", error_reserved: "Izen hori ezin da erabili", error_cred: "Datuak okerrak dira", error_banned: "KONTUA BLOKEATUTA. Adminarekin hitz egin.", welcome: "Ongi etorri" },
-          admin: { title: "Administrazio Panela", subtitle: "Erabiltzaileen kontrola eta segurtasuna", col_user: "Erabiltzailea", col_ip: "IP Helbidea", col_device: "ID Gailua", col_pass: "Pasahitza", col_score: "Markak (Ops/TF/Pyr)", col_status: "Egoera", col_actions: "Ekintzak", status_ok: "Aktibo", status_ban: "Kanporatua", btn_ban: "Kanporatu", btn_unban: "Onartu", btn_cancel: "Ezeztatu", no_users: "Ez dago erabiltzailerik sisteman.", logout: "Irten paneletik", confirm_ban: "Ziur erabiltzaile hau betirako ezabatu nahi duzula?" },
+          admin: { title: "Administrazio Panela", subtitle: "Erabiltzaileen kontrola eta segurtasuna", col_user: "Erabiltzailea", col_ip: "IP Helbidea", col_device: "ID Gailua", col_pass: "Pasahitza", col_score: "Markak (Ops/TF/Pyr)", col_status: "Egoera", col_actions: "Ekintzak", status_ok: "Aktibo", status_ban: "Kanporatua", btn_ban: "Kanporatu", btn_unban: "Onartu", btn_cancel: "Ezeztatu", no_users: "Ez dago erabiltzailerik sisteman.", logout: "Irten paneletik", confirm_ban: "Ziur erabiltzaile hau betirako ezabatu nahi duzula?", btn_leaderboards: "Ikusi Sailkapenak", lb_title: "Sailkapen Orokorra" },
           records: { title: "Errekorren Gela", subtitle: "1 minutu. Ahalik eta gehien asmatu. +1 Asmatu, -2 Huts egin.", start: "Hasi Erronka", time: "Denbora", score: "Puntuak", game_ops: "Nahasia", game_pyr: "Piramideak", game_tf: "Egia ala Gezurra", game_compare: "Konparatu", game_add: "Batuketak", game_sub: "Kenketak", game_mul: "Biderketak", game_combined: "Konbinatuak", new_record: "ERREKOR BERRIA!", final_score: "Amaierako Puntuazioa", leaderboard: "Top 3 Sailkapena", no_scores: "Oraindik ez dago markarik", back: "Itzuli", check: "Egiaztatu" },
           profile: { title: "Zure Profila", best_scores: "Marka Onenak", delete_acc: "Ezabatu Kontua", logout: "Saioa itxi", confirm_del: "Ziur zaude? Ezin da desegin." },
           thermometer: { title: "Tenperatura eta Zenbakiak", desc: "Termometroak zenbaki osoak ulertzeko balio du.", ref: "Zero (0) erreferentzia da.", pos: "Zerotik gora: Positiboak (+)", neg: "Zerotik behera: Negatiboak (-)", label: "Mugitu tenperatura:", above: "Zero gainetik", below: "Zero azpitik", zero: "Zero" },
@@ -228,7 +272,7 @@
           intro_desc: "En el mundo real, los números no siempre son positivos. ¡Para las deudas, el frío y los sótanos... necesitamos negativos!",
           nav: { intro: "¿Qué son?", line: "Orden", ops: "Operaciones", probs: "Problemas", games: "Jugar", records: "Récords", profile: "Perfil" },
           auth: { login_title: "Entrar", register_title: "Registrarse", user_ph: "Usuario", pass_ph: "Contraseña", btn_login: "Entrar", btn_register: "Crear cuenta", no_account: "¿No tienes cuenta?", has_account: "¿Ya tienes cuenta?", error_exists: "El usuario ya existe", error_reserved: "Nombre reservado", error_cred: "Datos incorrectos", error_banned: "CUENTA BLOQUEADA. Contacta al Admin.", welcome: "Bienvenido" },
-          admin: { title: "Panel de Administración", subtitle: "Control de usuarios y seguridad", col_user: "Usuario", col_ip: "Dirección IP", col_device: "ID Dispositivo", col_pass: "Contraseña", col_score: "Récords", col_status: "Estado", col_actions: "Acciones", status_ok: "Activo", status_ban: "Expulsado", btn_ban: "Eliminar", btn_unban: "Readmitir", btn_cancel: "Cancelar", no_users: "No hay usuarios en el sistema.", logout: "Salir del panel", confirm_ban: "¿Seguro que quieres eliminar definitivamente a este usuario?" },
+          admin: { title: "Panel de Administración", subtitle: "Control de usuarios y seguridad", col_user: "Usuario", col_ip: "Dirección IP", col_device: "ID Dispositivo", col_pass: "Contraseña", col_score: "Récords", col_status: "Estado", col_actions: "Acciones", status_ok: "Activo", status_ban: "Expulsado", btn_ban: "Eliminar", btn_unban: "Readmitir", btn_cancel: "Cancelar", no_users: "No hay usuarios en el sistema.", logout: "Salir del panel", confirm_ban: "¿Seguro que quieres eliminar definitivamente a este usuario?", btn_leaderboards: "Ver Clasificaciones", lb_title: "Clasificación Global" },
           records: { title: "Sala de Récords", subtitle: "1 minuto. Acierta el máximo posible. +1 Acierto, -2 Fallo.", start: "Empezar Reto", time: "Tiempo", score: "Puntos", game_ops: "Popurrí", game_pyr: "Pirámides", game_tf: "Verdadero o Falso", game_compare: "Comparar", game_add: "Sumas", game_sub: "Restas", game_mul: "Multiplicar", game_combined: "Combinadas", new_record: "¡NUEVO RÉCORD!", final_score: "Puntuación Final", leaderboard: "Top 3 Clasificación", no_scores: "Aún no hay marcas", back: "Volver", check: "Comprobar" },
           profile: { title: "Tu Perfil", best_scores: "Mejores Marcas", delete_acc: "Borrar Cuenta", logout: "Cerrar Sesión", confirm_del: "¿Seguro? No se puede deshacer." },
           thermometer: { title: "Temperatura y Números", desc: "El termómetro sirve para entender los números enteros.", ref: "El cero (0) es la referencia.", pos: "Sobre cero: Positivos (+)", neg: "Bajo cero: Negativos (-)", label: "Mueve la temperatura:", above: "Sobre cero", below: "Bajo cero", zero: "Cero" },
@@ -245,7 +289,7 @@
           intro_desc: "في العالم الحقيقي، الأرقام ليست دائماً موجبة. للديون، والبرد، والأقبية... نحتاج إلى السلبيات!",
           nav: { intro: "ما هي؟", line: "الترتيب", ops: "العمليات", probs: "مسائل", games: "لعب", records: "أرقام قياسية", profile: "ملف" },
           auth: { login_title: "دخول", register_title: "تسجيل", user_ph: "اسم المستخدم", pass_ph: "كلمة المرور", btn_login: "دخول", btn_register: "إنشاء حساب", no_account: "ليس لديك حساب؟", has_account: "لديك حساب بالفعل؟", error_exists: "المستخدم موجود بالفعل", error_reserved: "هذا الاسم محجوز", error_cred: "بيانات غير صحيحة", error_banned: "حساب محظور. اتصل بالمسؤول.", welcome: "أهلاً بك" },
-          admin: { title: "لوحة التحكم", subtitle: "التحكم بالمستخدمين والأمان", col_user: "المستخدم", col_ip: "عنوان IP", col_device: "معرف الجهاز", col_pass: "كلمة المرور", col_score: "النتائج", col_status: "الحالة", col_actions: "إجراءات", status_ok: "نشط", status_ban: "مطرود", btn_ban: "حذف", btn_unban: "إلغاء الحظر", btn_cancel: "إلغاء", no_users: "لا يوجد مستخدمين", logout: "خروج", confirm_ban: "هل أنت متأكد من حذف هذا المستخدم؟" },
+          admin: { title: "لوحة التحكم", subtitle: "التحكم بالمستخدمين والأمان", col_user: "المستخدم", col_ip: "عنوان IP", col_device: "معرف الجهاز", col_pass: "كلمة المرور", col_score: "النتائج", col_status: "الحالة", col_actions: "إجراءات", status_ok: "نشط", status_ban: "مطرود", btn_ban: "حذف", btn_unban: "إلغاء الحظر", btn_cancel: "إلغاء", no_users: "لا يوجد مستخدمين", logout: "خروج", confirm_ban: "هل أنت متأكد من حذف هذا المستخدم؟", btn_leaderboards: "عرض التصنيفات", lb_title: "التصنيف العام" },
           records: { title: "قاعة الأرقام القياسية", subtitle: "دقيقة واحدة. احصل على أقصى عدد. +1 صحيح، -2 خطأ.", start: "ابدأ التحدي", time: "الوقت", score: "النقاط", game_ops: "مختلط", game_pyr: "أهرامات", game_tf: "صح أم خطأ", game_compare: "مقارنة", game_add: "جمع", game_sub: "طرح", game_mul: "ضرب", game_combined: "مختلطة", new_record: "رقم قياسي جديد!", final_score: "النتيجة النهائية", leaderboard: "أفضل 3 مراكز", no_scores: "لا توجد أرقام حتى الآن", back: "رجوع", check: "تحقق" },
           profile: { title: "ملفك الشخصي", best_scores: "أفضل النتائج", delete_acc: "حذف الحساب", logout: "تسجيل خروج", confirm_del: "هل أنت متأكد؟ لا يمكن التراجع." },
           thermometer: { title: "درجة الحرارة", desc: "مقياس الحرارة يساعد في فهم الأعداد الصحيحة.", ref: "الصفر (0) هو المرجع.", pos: "فوق الصفر: موجب (+)", neg: "تحت الصفر: سالب (-)", label: "حرك درجة الحرارة:", above: "فوق الصفر", below: "تحت الصفر", zero: "صفر" },
@@ -406,7 +450,7 @@
            <div className="min-h-[80vh] flex items-center justify-center p-4">
               <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full">
                  <h1 className="text-2xl font-bold text-center mb-6">{isReg ? t.register_title : t.login_title}</h1>
-                 {!FIREBASE_CONFIG && <div className="mb-4 text-xs bg-yellow-50 text-yellow-700 p-2 rounded text-center">Modo Local (Sin Base de Datos)</div>}
+                 {!window.FIREBASE_CONFIG && <div className="mb-4 text-xs bg-yellow-50 text-yellow-700 p-2 rounded text-center">Modo Local (Sin Base de Datos)</div>}
                  <form onSubmit={sub} className="space-y-4">
                     <input className="w-full p-3 border rounded-xl" placeholder={t.user_ph} value={u} onChange={e=>setU(e.target.value)} />
                     <input className="w-full p-3 border rounded-xl" type="password" placeholder={t.pass_ph} value={p} onChange={e=>setP(e.target.value)} />
@@ -424,7 +468,11 @@
           const [users, setUsers] = useState([]);
           const [delUser, setDelUser] = useState(null);
           const [showPass, setShowPass] = useState({});
+          const [showLb, setShowLb] = useState(false);
+          const [activeLb, setActiveLb] = useState('ops');
           const t = TRANSLATIONS[lang].admin;
+          
+          const games = ['ops','tf','pyr','compare','add','sub','mul','combined'];
 
           const load = async () => setUsers(await StorageManager.getAllUsers());
           useEffect(() => { load(); }, []);
@@ -441,7 +489,15 @@
 
           return (
              <div className="pb-10">
-                <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold">{t.title}</h2><button onClick={onLogout} className="bg-slate-800 text-white px-4 py-2 rounded">{t.logout}</button></div>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold">{t.title}</h2>
+                    <div className="flex gap-2">
+                        {db && <div className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold mr-2"><Cloud size={14}/> Cloud</div>}
+                        {!db && <div className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold mr-2"><CloudOff size={14}/> Local</div>}
+                        <button onClick={() => setShowLb(true)} className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 font-bold flex items-center gap-2"><BarChart2 size={16}/> {t.btn_leaderboards}</button>
+                        <button onClick={onLogout} className="bg-slate-800 text-white px-4 py-2 rounded shadow hover:bg-slate-700">{t.logout}</button>
+                    </div>
+                </div>
                 <div className="bg-white rounded-xl shadow overflow-x-auto">
                    <table className="w-full text-sm text-left">
                       <thead className="bg-slate-100 font-bold text-slate-700"><tr><th className="p-4">{t.col_user}</th><th className="p-4">{t.col_ip}</th><th className="p-4">{t.col_device}</th><th className="p-4">{t.col_pass}</th><th className="p-4">{t.col_score}</th><th className="p-4">{t.col_actions}</th></tr></thead>
@@ -462,6 +518,8 @@
                       </tbody>
                    </table>
                 </div>
+                
+                {/* Delete Confirmation Modal */}
                 {delUser && (
                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                       <div className="bg-white p-6 rounded-xl max-w-sm w-full m-4">
@@ -473,6 +531,61 @@
                          </div>
                       </div>
                    </div>
+                )}
+                
+                {/* Full Leaderboard Modal */}
+                {showLb && (
+                    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+                            <div className="p-5 border-b flex justify-between items-center bg-slate-50">
+                                <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Trophy className="text-yellow-500"/> {t.lb_title}</h3>
+                                <button onClick={() => setShowLb(false)} className="bg-slate-200 p-2 rounded-full hover:bg-slate-300 transition-colors"><X size={20}/></button>
+                            </div>
+                            <div className="p-4 border-b bg-white overflow-x-auto">
+                                <div className="flex gap-2">
+                                    {games.map(g => (
+                                        <button 
+                                          key={g} 
+                                          onClick={() => setActiveLb(g)}
+                                          className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition-all ${activeLb === g ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                        >
+                                           {TRANSLATIONS[lang].records['game_'+g]}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex-grow overflow-y-auto bg-slate-50 p-6">
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wider">
+                                            <tr>
+                                            <th className="p-4 w-20 text-center">#</th>
+                                            <th className="p-4">{t.col_user}</th>
+                                            <th className="p-4 text-right">{t.col_score}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {users
+                                            .filter(u => u.scores && u.scores[activeLb] !== undefined)
+                                            .sort((a,b) => b.scores[activeLb] - a.scores[activeLb])
+                                            .map((u, i) => (
+                                                <tr key={u.username} className="border-b border-slate-100 hover:bg-indigo-50/30 transition-colors">
+                                                    <td className="p-4 text-center font-bold text-slate-500">
+                                                        {i < 3 ? <span className={`w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm font-bold mx-auto ${i===0?'bg-yellow-400':i===1?'bg-slate-400':'bg-orange-400'}`}>{i+1}</span> : i+1}
+                                                    </td>
+                                                    <td className="p-4 font-bold text-slate-800">{u.username}</td>
+                                                    <td className="p-4 text-right font-mono font-black text-indigo-600 text-lg">{u.scores[activeLb]}</td>
+                                                </tr>
+                                            ))}
+                                            {users.filter(u => u.scores && u.scores[activeLb] !== undefined).length === 0 && (
+                                                <tr><td colSpan="3" className="p-8 text-center text-slate-400 italic">Ez dago daturik (No data)</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 )}
              </div>
           );
