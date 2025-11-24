@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="eu">
   <head>
@@ -19,13 +18,11 @@
       .animate-bounce-small { animation: bounceSmall 2s infinite; }
       @keyframes bounceSmall { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
       .elevator-card { background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%); }
-      
-      /* Scrollbar hiding */
       .scrollbar-hide::-webkit-scrollbar { display: none; }
       .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
     
-    <!-- Robust Import Map using Google's Official CDN for Firebase -->
+    <!-- Robust Import Map using Google CDN (gstatic) for Firebase reliability -->
     <script type="importmap">
 {
   "imports": {
@@ -42,27 +39,17 @@
 </head>
   <body>
     <!-- 🔴🔴 CONFIGURATION SECTION 🔴🔴 -->
-    <!-- Paste your keys here replacing 'null'. Keep the syntax exactly as shown in Firebase Console. -->
     <script>
+      // CONFIGURACIÓN DE FIREBASE
       window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDKmSAA6FNEudrsrP5KMw13ah5ovX7lY2M",
-  authDomain: "zenbaki-osoak.firebaseapp.com",
-  databaseURL: "https://zenbaki-osoak-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "zenbaki-osoak",
-  storageBucket: "zenbaki-osoak.firebasestorage.app",
-  messagingSenderId: "137265772416",
-  appId: "1:137265772416:web:16e672aee402c3b4637365"
-};;
-      // Example:
-      // window.FIREBASE_CONFIG = {
-      //   apiKey: "AIza...",
-      //   authDomain: "...",
-      //   databaseURL: "...",
-      //   projectId: "...",
-      //   storageBucket: "...",
-      //   messagingSenderId: "...",
-      //   appId: "..."
-      // };
+        apiKey: "AIzaSyDKmSAA6FNEudrsrP5KMw13ah5ovX7lY2M",
+        authDomain: "zenbaki-osoak.firebaseapp.com",
+        databaseURL: "https://zenbaki-osoak-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "zenbaki-osoak",
+        storageBucket: "zenbaki-osoak.firebasestorage.app",
+        messagingSenderId: "137265772416",
+        appId: "1:137265772416:web:16e672aee402c3b4637365"
+      };
     </script>
 
     <div id="root"></div>
@@ -82,19 +69,15 @@
       import { getDatabase, ref, get, set, remove, update } from 'firebase/database';
 
       let db = null;
-      let firebaseError = null;
       
-      // Safely try to init firebase using the global config
+      // Initialize Firebase
       if (window.FIREBASE_CONFIG) {
         try {
             const app = initializeApp(window.FIREBASE_CONFIG);
             db = getDatabase(app);
-            console.log("Firebase initialized successfully");
+            console.log("Firebase initialized successfully via gstatic");
         } catch (error) {
             console.error("Firebase Init Error:", error);
-            firebaseError = error.message;
-            // We DO NOT alert the user here to avoid annoying popups.
-            // The app will gracefully degrade to local storage.
         }
       }
 
@@ -123,7 +106,6 @@
               return [];
             } catch (e) {
               console.error("Firebase Read Error:", e);
-              // Fallback to local if read fails (e.g. permission denied or offline)
               return JSON.parse(localStorage.getItem(DB_KEY) || '[]');
             }
           } else {
@@ -152,7 +134,7 @@
                 await set(ref(db, 'users/' + username), newUser);
             } catch(e) {
                 console.error("Firebase Write Error", e);
-                // If cloud fails, fallback local so user is not stuck
+                // Fallback local
                 users.push(newUser);
                 StorageManager.saveLocal(users);
             }
@@ -178,7 +160,7 @@
              if (db) {
                 try {
                     await update(ref(db, 'users/' + user.username), { ip, deviceId });
-                } catch(e) { console.error("Update Error", e); }
+                } catch(e) {}
              } else {
                 const idx = users.findIndex(u => u.username === user.username);
                 users[idx] = updatedUser;
@@ -214,7 +196,7 @@
                 if (!snapshot.exists()) return 'deleted';
                 if (snapshot.val().banned) return 'banned';
                 return 'ok';
-            } catch(e) { return 'ok'; } // If offline, assume OK to not block user
+            } catch(e) { return 'ok'; } 
           } else {
             const users = await StorageManager.getAllUsers();
             const u = users.find(u => u.username === username);
@@ -235,7 +217,6 @@
                try {
                   await update(ref(db, `users/${username}/scores`), { [gameId]: score });
                } catch(e) { console.error("Score Save Error", e); }
-               // Also save local cache for speed
                return { isNewRecord: true, user: { ...user, scores: { ...user.scores, [gameId]: score } } };
              } else {
                user.scores = user.scores || {};
@@ -449,16 +430,16 @@
         return (
            <div className="min-h-[80vh] flex items-center justify-center p-4">
               <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full">
-                 <h1 className="text-2xl font-bold text-center mb-6">{isReg ? t.register_title : t.login_title}</h1>
+                 <h1 className="text-2xl font-bold text-center mb-6 text-slate-800">{isReg ? t.register_title : t.login_title}</h1>
                  {!window.FIREBASE_CONFIG && <div className="mb-4 text-xs bg-yellow-50 text-yellow-700 p-2 rounded text-center">Modo Local (Sin Base de Datos)</div>}
                  <form onSubmit={sub} className="space-y-4">
-                    <input className="w-full p-3 border rounded-xl" placeholder={t.user_ph} value={u} onChange={e=>setU(e.target.value)} />
-                    <input className="w-full p-3 border rounded-xl" type="password" placeholder={t.pass_ph} value={p} onChange={e=>setP(e.target.value)} />
-                    <div className="text-xs text-center text-slate-400">IP: {ip}</div>
+                    <input className="w-full p-3 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 bg-white" placeholder={t.user_ph} value={u} onChange={e=>setU(e.target.value)} />
+                    <input className="w-full p-3 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 bg-white" type="password" placeholder={t.pass_ph} value={p} onChange={e=>setP(e.target.value)} />
+                    <div className="text-xs text-center text-slate-500">IP: {ip}</div>
                     {err && <div className="text-red-500 text-center font-bold">{err}</div>}
-                    <button className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">{isReg ? t.btn_register : t.btn_login}</button>
+                    <button className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors">{isReg ? t.btn_register : t.btn_login}</button>
                  </form>
-                 <button onClick={()=>setIsReg(!isReg)} className="w-full mt-4 text-indigo-600 text-sm font-bold">{isReg ? t.has_account : t.no_account}</button>
+                 <button onClick={()=>setIsReg(!isReg)} className="w-full mt-4 text-indigo-600 text-sm font-bold hover:underline">{isReg ? t.has_account : t.no_account}</button>
               </div>
            </div>
         );
@@ -490,7 +471,7 @@
           return (
              <div className="pb-10">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">{t.title}</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">{t.title}</h2>
                     <div className="flex gap-2">
                         {db && <div className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold mr-2"><Cloud size={14}/> Cloud</div>}
                         {!db && <div className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold mr-2"><CloudOff size={14}/> Local</div>}
@@ -504,15 +485,15 @@
                       <tbody>
                          {users.map(u => (
                             <tr key={u.username} className="border-t hover:bg-slate-50">
-                               <td className="p-4 font-bold">{u.username}</td>
-                               <td className="p-4 font-mono text-xs">{u.ip}</td>
+                               <td className="p-4 font-bold text-slate-900">{u.username}</td>
+                               <td className="p-4 font-mono text-xs text-slate-600">{u.ip}</td>
                                <td className="p-4 font-mono text-xs text-slate-400" title={u.deviceId}>{u.deviceId ? u.deviceId.substring(0,8)+'...' : '-'}</td>
-                               <td className="p-4 font-mono text-xs flex items-center gap-2">
+                               <td className="p-4 font-mono text-xs flex items-center gap-2 text-slate-800">
                                   {showPass[u.username] ? u.password : '••••••'}
                                   <button onClick={()=>togglePass(u.username)} className="text-slate-400 hover:text-indigo-600">{showPass[u.username] ? <EyeOff size={14}/> : <Eye size={14}/>}</button>
                                </td>
-                               <td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{Object.values(u.scores||{}).reduce((a,b)=>a+b,0)} pts</span></td>
-                               <td className="p-4"><button onClick={()=>setDelUser(u)} className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold">{t.btn_ban}</button></td>
+                               <td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{Object.values(u.scores||{}).reduce((a,b)=>a+b,0)} pts</span></td>
+                               <td className="p-4"><button onClick={()=>setDelUser(u)} className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700 transition-colors">{t.btn_ban}</button></td>
                             </tr>
                          ))}
                       </tbody>
@@ -524,10 +505,10 @@
                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                       <div className="bg-white p-6 rounded-xl max-w-sm w-full m-4">
                          <h3 className="text-xl font-bold text-red-600 mb-2">{t.btn_ban} {delUser.username}</h3>
-                         <p className="mb-6">{t.confirm_ban}</p>
+                         <p className="mb-6 text-slate-700">{t.confirm_ban}</p>
                          <div className="flex justify-end gap-3">
-                            <button onClick={()=>setDelUser(null)} className="px-4 py-2 font-bold text-slate-600">{t.btn_cancel}</button>
-                            <button onClick={doDel} className="px-4 py-2 bg-red-600 text-white rounded font-bold">{t.btn_ban}</button>
+                            <button onClick={()=>setDelUser(null)} className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 rounded">{t.btn_cancel}</button>
+                            <button onClick={doDel} className="px-4 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700">{t.btn_ban}</button>
                          </div>
                       </div>
                    </div>
@@ -657,9 +638,11 @@
                         {floors.map(floor => (
                             <div key={floor} className="flex items-center gap-3">
                                 <div className={`w-12 h-9 rounded-lg border-2 flex items-center justify-center font-mono font-bold text-lg shadow-sm
-                                    ${floor === 0 ? 'bg-white border-white text-blue-900 z-10 scale-105' : 
-                                      floor > 0 ? 'bg-transparent border-white/50 text-white' : 
-                                      'bg-indigo-900/60 border-indigo-500/50 text-white'}`}>
+                                    ${floor === 0 
+                                      ? 'bg-white border-white text-blue-900 z-10 scale-105' 
+                                      : floor > 0 
+                                        ? 'bg-transparent border-white/50 text-white' 
+                                        : 'bg-indigo-900/60 border-indigo-500/50 text-white'}`}>
                                     {floor}
                                 </div>
                                 <span className="text-[10px] uppercase font-bold tracking-wider opacity-80 w-12 text-left">
@@ -1060,14 +1043,14 @@
          
          if(!user) return <div className="min-h-screen bg-slate-50"><div className="flex justify-end p-4"><LanguageSelector current={lang} onChange={setLang}/></div><AuthScreen lang={lang} onLogin={handleLogin}/></div>;
          
-         if(user.isAdmin) return <div className="min-h-screen bg-slate-50 p-4"><div className="max-w-7xl mx-auto"><div className="flex justify-between mb-4"><span>Admin Console</span><LanguageSelector current={lang} onChange={setLang}/></div><AdminPanel lang={lang} onLogout={()=>setUser(null)}/></div></div>;
+         if(user.isAdmin) return <div className="min-h-screen bg-slate-50 p-4"><div className="max-w-7xl mx-auto"><div className="flex justify-between mb-4 items-center"><span className="font-bold text-xl text-slate-800">Admin Console</span><LanguageSelector current={lang} onChange={setLang}/></div><AdminPanel lang={lang} onLogout={()=>setUser(null)}/></div></div>;
 
          const NavBtn = ({id, icon, label}) => <button onClick={()=>{setSec(id); setMenu(false);}} className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-bold transition-all ${sec===id?'bg-slate-800 text-white shadow-md':'text-slate-500 hover:bg-white hover:text-slate-800'}`}>{icon}{label}</button>;
          const t = TRANSLATIONS[lang];
          
          return (
             <div className={`min-h-screen bg-[#F8FAFC] flex flex-col text-slate-800 ${lang==='ar'?'font-arabic':''}`} dir={lang==='ar'?'rtl':'ltr'}>
-               <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200/60">
+               <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
                   <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                      <div className="flex items-center gap-2 font-bold text-xl cursor-pointer" onClick={()=>setSec('intro')}><div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-bold shadow-indigo-200 shadow-md">Z</div><span className="hidden xl:inline tracking-tight text-slate-900">ZenbakiOsoak</span></div>
                      <div className="hidden lg:flex gap-1.5"><NavBtn id="intro" icon={<Home size={16}/>} label={t.nav.intro}/><NavBtn id="number_line" icon={<Layout size={16}/>} label={t.nav.line}/><NavBtn id="operations" icon={<Calculator size={16}/>} label={t.nav.ops}/><NavBtn id="problems" icon={<BookOpen size={16}/>} label={t.nav.probs}/><NavBtn id="games" icon={<Star size={16}/>} label={t.nav.games}/><NavBtn id="records" icon={<Trophy size={16}/>} label={t.nav.records}/><NavBtn id="profile" icon={<User size={16}/>} label={t.nav.profile}/><div className="w-px h-6 bg-slate-200 mx-2"></div><LanguageSelector current={lang} onChange={setLang}/></div>
