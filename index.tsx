@@ -1,0 +1,1 @@
+// Code moved to index.html for static deployment
